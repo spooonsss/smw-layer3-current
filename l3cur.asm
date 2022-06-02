@@ -1,38 +1,39 @@
-header
 lorom
 
 ;---------;
 ; Defines ;
 ;---------;
 
-!FreeSpace = $179717  ; Point to freespace!!
+
 !FreeRAM = $7C        ; Free RAM to use. One byte required.
 !LeftCurOnPlat = $F8  ; X speed of player when standing in water on a platform, left current
 !LeftCurInWat = $F0   ; X speed of player when floating in water, left current
 !RightCurOnPlat = $08 ; X speed of player when standing in water on a platform, right current
 !RightCurInWat = $10  ; X speed of player when floating in water, right current
 
+!bank = $800000
+
 ;-------------;
 ; Ze Hijacks! ;
 ;-------------;
 
 org $00D772
-JML OhSauce
-
-org $00DA55
-JML ASauce
+autoclean JML OhSauce
 
 org $05C4F2
-JML Itsa
+autoclean JML Itsa
+
+org $00D535
+DATA_00D535:
+
+org $00D745
+autoclean JML TideSwim
 
 ;------------;
 ; Ze Custom! ;
 ;------------;
 
-org !FreeSpace|$800000
-db "STAR"
-dw End-OhSauce-1
-dw End-OhSauce-1^$FFFF
+freecode
 
 OhSauce:
 PHX
@@ -95,7 +96,7 @@ SpPtr:
 dl Speed
 dl Speed2
 
-Speed:
+Speed: ; DATA_00D5C9
 db $00,$00,$00,$00,$00,$00,$00,$00
 db $00,$00,$00,$F0,$00,$10,$00,$00
 db $00,$00,$00,$00,$00,$00,$00,$E0
@@ -109,26 +110,58 @@ db $00,$00,$00,$00,$00,$00,$00,$E0
 db $00,$20,$00,$00,$00,$00,$00,!RightCurInWat
 db $00,!RightCurOnPlat
 
-OkaySauce:
-STA $22
-LDA #$01
-JML $05C4F6
-
 Itsa:
 LDX !FreeRAM
 BEQ OkaySauce
 SEC
 SBC #$02
-BRA OkaySauce
 
-ASauce:
-LDY !FreeRAM
-BNE Heh
-LDY $1403
-BEQ Heh
-JML $00DA5A
+OkaySauce:
+STA $22
+LDA #$01
+JML $05C4F6|!bank
 
-Heh:
-JML $00DA5D
+TideSwim:
+;	SBC.w DATA_00D535,Y			;$00D745	|| Branch if Mario is at the maximum X speed for the slope he's on.
+;	BEQ CODE_00D76B				;$00D748	||
+;	EOR.w DATA_00D535,Y			;$00D74A	||
+;	BPL CODE_00D76B				;$00D74D	|/
+CPY #$78
+BCC .vanilla
+CPY #$88
+BCS .vanilla
 
-End:
+PHA
+LDA !FreeRAM
+BEQ .vanilla_pla
+
+LDA.b #(DATA_00D535_right-$78)>>16
+STA $02
+LDA.b #(DATA_00D535_right-$78)>>8
+STA $01
+LDA.b #DATA_00D535_right-$78
+STA $00
+PLA
+
+SBC [$00],Y
+BEQ CODE_00D76B
+EOR [$00],Y
+BPL CODE_00D76B
+JML $00D74F|!bank
+
+.vanilla_pla
+PLA
+.vanilla
+SBC.w DATA_00D535,Y
+BEQ CODE_00D76B
+EOR.w DATA_00D535,Y
+BPL CODE_00D76B
+JML $00D74F|!bank
+
+
+CODE_00D76B:
+JML $00D76B|!bank
+
+DATA_00D535_right:
+	db $F8,$08,$F0,$10,$F4,$04,-$08,-$E8		; 78 - Water (ground, swimming, tide ground, tide swimming)
+	db $F0,$10,$E0,$20,$EC,$0C,-$18,-$D8		; 80 - Water with item (ground, swimming, tide ground, tide swimming)
